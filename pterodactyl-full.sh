@@ -7,7 +7,7 @@
 if [ "$SSH_TTY" ]; then
     echo -e "\e[1;36m✅ Termius session detected — safe install running...\e[0m"
 else
-    echo -e "\e[1;33m⚠️ Not in Termius. Continuing anyway...\e[0m"
+    echo -e "\e[1;33m🚀 Boost your gameplay now...\e[0m"
 fi
 
 # 📦 System update
