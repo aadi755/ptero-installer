@@ -1,43 +1,45 @@
 #!/bin/bash
 
-# 💜 Advik Panel + Wings Installer
+# 💜 Advik Installer Banner
 echo -e "\e[1;35m"
 echo "=============================================="
 echo "   Advik's One-Click Pterodactyl Setup"
-echo "   Panel + Daemon 🚀"
+echo "   Panel + Daemon + Safe for Termius 🚀"
 echo "=============================================="
 echo -e "\e[0m"
 
-# 🔍 Detect tmux
+# 🔍 Auto tmux safety
 if [ -z "$TMUX" ]; then
-    echo -e "\e[1;33m⚠️  You are NOT inside tmux."
-    echo "To prevent crashes on disconnect, we'll auto-start tmux session."
-    echo -e "Press [Enter] to continue...\e[0m"
-    read
+    echo -e "\e[1;33m⚠️  You're not in tmux. Auto-starting safe session...\e[0m"
     sudo apt install -y tmux
-    tmux new-session -s ptero-install "bash <(curl -s https://raw.githubusercontent.com/advikdev/ptero-installer/main/pterodactyl-full.sh)"
+    tmux new-session -s ptero-install "bash <(curl -s https://raw.githubusercontent.com/aadi755/ptero-installer/main/pterodactyl-full.sh)"
     exit 0
 fi
 
 # ✅ Update system
 apt update -y && apt upgrade -y
 
-# 📦 Install dependencies
-apt install -y curl wget sudo unzip tar nginx mariadb-server php8.1 php8.1-{cli,common,mbstring,gd,curl,mysql,bcmath,xml,fpm,zip} \
-redis-server git software-properties-common gnupg apt-transport-https lsb-release ca-certificates
+# 📦 Required base packages
+apt install -y curl wget sudo lsb-release gnupg software-properties-common ca-certificates apt-transport-https unzip tar
 
-# 🧬 Node.js + Composer
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-apt install -y nodejs
-curl -sS https://getcomposer.org/installer | php
-mv composer.phar /usr/local/bin/composer
+# 🧬 PHP & Dependencies
+add-apt-repository ppa:ondrej/php -y
+apt update -y
+apt install -y php8.1 php8.1-{cli,common,mbstring,gd,curl,mysql,bcmath,xml,fpm,zip}
 
 # 🐳 Docker
 curl -sSL https://get.docker.com | sh
 systemctl enable --now docker
 
-# 🐘 Setup MariaDB
-echo "[+] Configuring MariaDB..."
+# 🧬 Node.js 18
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt install -y nodejs
+
+# 📦 Composer
+curl -sS https://getcomposer.org/installer | php
+mv composer.phar /usr/local/bin/composer
+
+# 🐘 MariaDB Setup
 systemctl enable --now mariadb
 mysql -u root <<MYSQL_SCRIPT
 CREATE DATABASE panel;
@@ -46,7 +48,7 @@ GRANT ALL PRIVILEGES ON panel.* TO 'ptero'@'127.0.0.1';
 FLUSH PRIVILEGES;
 MYSQL_SCRIPT
 
-# 📂 Panel setup
+# 📂 Panel Install
 mkdir -p /var/www/pterodactyl
 cd /var/www/pterodactyl
 curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
@@ -62,7 +64,8 @@ php artisan migrate --seed --force
 chown -R www-data:www-data /var/www/pterodactyl
 chmod -R 755 /var/www/pterodactyl/storage /var/www/pterodactyl/bootstrap/cache
 
-# 🌐 NGINX config
+# 🌐 NGINX setup
+apt install -y nginx
 cat > /etc/nginx/sites-available/pterodactyl <<EOF
 server {
     listen 80;
@@ -84,23 +87,25 @@ server {
 }
 EOF
 
-ln -s /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/pterodactyl
-rm /etc/nginx/sites-enabled/default
+ln -s /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
 systemctl restart nginx php8.1-fpm
 
 # 🧬 Wings setup
-echo -e "\n\e[1;34m[+] Now setting up Wings Daemon...\e[0m"
 mkdir -p /etc/pterodactyl
 cd /etc/pterodactyl
 curl -Lo wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
 chmod +x wings
 
-# 📥 Ask for config URL
 echo -e "\n📥 Paste your Wings config URL (from panel):"
 read -p "🔗 URL: " config_url
-curl -Lo config.yml "$config_url"
+if curl --output /dev/null --silent --head --fail "$config_url"; then
+    curl -Lo config.yml "$config_url"
+else
+    echo "❌ Invalid URL. Wings config download failed."
+    exit 1
+fi
 
-# 🛠️ systemd for Wings
 cat > /etc/systemd/system/wings.service <<EOF
 [Unit]
 Description=Pterodactyl Wings Daemon
@@ -121,10 +126,10 @@ EOF
 systemctl daemon-reexec
 systemctl enable --now wings
 
-# ✅ DONE!
-echo -e "\n\e[1;32m✅ Install Complete!"
+# ✅ Done
+echo -e "\n\e[1;32m✅ ADVIK SETUP COMPLETE!"
 echo "🌐 Panel: http://<your-server-ip>"
-echo "🛠  MySQL: user=ptero, pass=StrongPassword123!"
-echo "🧠 Wings: running & linked to panel"
-echo "🛑 If you got disconnected, just run: tmux attach"
+echo "🛠 MySQL: user=ptero / pass=StrongPassword123!"
+echo "🧬 Wings: running and linked"
+echo -e "🛑 To resume install if disconnected: \e[4mtmux attach\e[0m"
 echo -e "\e[0m"
