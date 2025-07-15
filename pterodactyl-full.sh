@@ -1,12 +1,23 @@
 #!/bin/bash
 
-# 💜 Advik's Full Pterodactyl Installer
+# 💜 Advik Panel + Wings Installer (Termius-Safe)
 echo -e "\e[1;35m"
 echo "=============================================="
-echo "     Advik's Pterodactyl Setup"
-echo "     Panel + Daemon + Everything Done 🚀"
+echo "   Advik's One-Click Pterodactyl Setup"
+echo "   Panel + Daemon + Safe for Termius 🚀"
 echo "=============================================="
 echo -e "\e[0m"
+
+# 🔍 Detect tmux
+if [ -z "$TMUX" ]; then
+    echo -e "\e[1;33m⚠️  You are NOT inside tmux."
+    echo "To prevent crashes on disconnect, we'll auto-start tmux session."
+    echo -e "Press [Enter] to continue...\e[0m"
+    read
+    sudo apt install -y tmux
+    tmux new-session -s ptero-install "bash <(curl -s https://raw.githubusercontent.com/advikdev/ptero-installer/main/pterodactyl-full.sh)"
+    exit 0
+fi
 
 # ✅ Update system
 apt update -y && apt upgrade -y
@@ -77,7 +88,7 @@ ln -s /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/pterodacty
 rm /etc/nginx/sites-enabled/default
 systemctl restart nginx php8.1-fpm
 
-# 🧬 Setup Wings (Daemon)
+# 🧬 Wings setup
 echo -e "\n\e[1;34m[+] Now setting up Wings Daemon...\e[0m"
 mkdir -p /etc/pterodactyl
 cd /etc/pterodactyl
@@ -85,11 +96,11 @@ curl -Lo wings https://github.com/pterodactyl/wings/releases/latest/download/win
 chmod +x wings
 
 # 📥 Ask for config URL
-echo -e "\n📥 Please paste your Wings config URL (from the panel node setup):"
+echo -e "\n📥 Paste your Wings config URL (from panel):"
 read -p "🔗 URL: " config_url
 curl -Lo config.yml "$config_url"
 
-# 🛠️ Create systemd service
+# 🛠️ systemd for Wings
 cat > /etc/systemd/system/wings.service <<EOF
 [Unit]
 Description=Pterodactyl Wings Daemon
@@ -107,15 +118,13 @@ LimitNOFILE=4096
 WantedBy=multi-user.target
 EOF
 
-# 🔁 Enable Wings
 systemctl daemon-reexec
 systemctl enable --now wings
 
-# ✅ ALL DONE
-echo -e "\n\n\e[1;32m🎉 ALL DONE!"
-echo -e "🌐 Panel: http://<YOUR-SERVER-IP>"
-echo -e "🧬 MySQL DB: panel / ptero / StrongPassword123!"
-echo -e "⚙️ Wings is running & waiting for connection to panel"
-echo -e "🔁 Restart: systemctl restart wings"
-echo -e "✅ Enjoy hosting with AuraNodes! 💜"
+# ✅ DONE!
+echo -e "\n\e[1;32m✅ Install Complete!"
+echo "🌐 Panel: http://<your-server-ip>"
+echo "🛠  MySQL: user=ptero, pass=StrongPassword123!"
+echo "🧠 Wings: running & linked to panel"
+echo "🛑 If you got disconnected, just run: tmux attach"
 echo -e "\e[0m"
