@@ -3,7 +3,7 @@
 # 💜 Advik's Full Pterodactyl Installer
 echo -e "\e[1;35m"
 echo "=============================================="
-echo "     Advik's One-Click Pterodactyl Setup"
+echo "     Advik's Pterodactyl Setup"
 echo "     Panel + Daemon + Everything Done 🚀"
 echo "=============================================="
 echo -e "\e[0m"
