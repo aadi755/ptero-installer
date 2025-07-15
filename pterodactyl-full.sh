@@ -1,13 +1,24 @@
 #!/bin/bash
 
-# 💜 One-Click Pterodactyl Installer with instan boost gameplay
+# 💜 One-Click Pterodactyl Installer
 # Made by Advik
+
+# 🎨 Banner
+echo -e "\e[1;35m"
+echo " █████╗ ██████╗ ██╗   ██╗██╗██╗  ██╗"
+echo "██╔══██╗██╔══██╗██║   ██║██║██║ ██╔╝"
+echo "███████║██║  ██║██║   ██║██║█████╔╝ "
+echo "██╔══██║██║  ██║╚██╗ ██╔╝██║██╔═██╗ "
+echo "██║  ██║██████╔╝ ╚████╔╝ ██║██║  ██╗"
+echo "╚═╝  ╚═╝╚═════╝   ╚═══╝  ╚═╝╚═╝  ╚═╝"
+echo "           🚀 ADVIK INSTALLER"
+echo -e "\e[0m"
 
 # ✅ Termius-safe detection
 if [ "$SSH_TTY" ]; then
     echo -e "\e[1;36m✅ Termius session detected — safe install running...\e[0m"
 else
-    echo -e "\e[1;33m🚀 Boost your gameplay now...\e[0m"
+    echo -e "\e[1;33m🚀 boosting your panel...\e[0m"
 fi
 
 # 📦 System update
@@ -15,7 +26,7 @@ apt update -y && apt upgrade -y
 apt install -y curl wget sudo gnupg software-properties-common \
   ca-certificates apt-transport-https unzip tar lsb-release jq
 
-# 🧬 PHP 8.1 setup
+# 🧬 PHP 8.1
 add-apt-repository ppa:ondrej/php -y
 apt update -y
 apt install -y php8.1 php8.1-{cli,common,mbstring,gd,curl,mysql,bcmath,xml,fpm,zip}
@@ -24,7 +35,7 @@ apt install -y php8.1 php8.1-{cli,common,mbstring,gd,curl,mysql,bcmath,xml,fpm,z
 apt install -y mariadb-server
 systemctl enable --now mariadb
 
-# 🔐 MySQL user + DB
+# 🔐 MySQL setup
 mysql -u root <<MYSQL_SCRIPT
 CREATE DATABASE panel;
 CREATE USER 'ptero'@'127.0.0.1' IDENTIFIED BY 'StrongPassword123!';
@@ -43,7 +54,7 @@ mv composer.phar /usr/local/bin/composer
 # 🌍 NGINX
 apt install -y nginx
 
-# 📂 Panel setup
+# 📂 Panel Installation
 mkdir -p /var/www/pterodactyl
 cd /var/www/pterodactyl
 curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
@@ -54,7 +65,7 @@ composer install --no-dev --optimize-autoloader
 cp .env.example .env
 php artisan key:generate --force
 
-# ⚙️ Database config
+# ⚙️ Configure .env DB
 sed -i "s/DB_DATABASE=.*/DB_DATABASE=panel/" .env
 sed -i "s/DB_USERNAME=.*/DB_USERNAME=ptero/" .env
 sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=StrongPassword123!/" .env
@@ -63,7 +74,7 @@ php artisan migrate --seed --force
 chown -R www-data:www-data /var/www/pterodactyl
 chmod -R 755 storage bootstrap/cache
 
-# 🌐 NGINX config
+# 🌐 NGINX Config
 cat > /etc/nginx/sites-available/pterodactyl <<EOF
 server {
     listen 80;
@@ -89,13 +100,17 @@ ln -s /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 systemctl restart nginx php8.1-fpm
 
-# 🧬 Wings install
+# 🧬 Wings
 mkdir -p /etc/pterodactyl
 cd /etc/pterodactyl
 curl -Lo wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
 chmod +x wings
 
-# 🛠 Wings systemd
+echo -e "\n📥 Paste your Wings config URL (from panel node setup):"
+read -p "🔗 URL: " config_url
+curl -Lo config.yml "$config_url"
+
+# 🛠️ Wings systemd
 cat > /etc/systemd/system/wings.service <<EOF
 [Unit]
 Description=Pterodactyl Wings Daemon
@@ -116,12 +131,7 @@ EOF
 systemctl daemon-reexec
 systemctl enable --now wings
 
-# 🌐 Wings config
-echo -e "\n📥 Paste your Wings config URL (from panel node setup):"
-read -p "🔗 URL: " config_url
-curl -Lo config.yml "$config_url"
-
-# 🌩️ Cloudflare Tunnel (Permanent)
+# 🌩️ Cloudflare Tunnel
 read -p "🌐 Tunnel NAME (e.g. auranodes-panel): " tunnel_name
 read -p "🔗 Full domain (e.g. panel.domain.com): " tunnel_domain
 
@@ -162,9 +172,9 @@ EOF
 systemctl daemon-reexec
 systemctl enable --now cloudflared
 
-# 🔧 Auto Node (RAM 500000, Disk 600000)
+# 🧠 Auto Node Creation (Custom RAM & Disk)
 read -p "🔑 Admin API Key: " api_key
-read -p "🌍 Panel URL (e.g. https://panel.yourdomain.com): " panel_url
+read -p "🌍 Panel URL (e.g. https://panel.domain.com): " panel_url
 
 # Create location
 curl -s -X POST "$panel_url/api/application/locations" \
@@ -172,13 +182,9 @@ curl -s -X POST "$panel_url/api/application/locations" \
   -H "Content-Type: application/json" \
   -d '{"short":"default","long":"Default Location"}' > /dev/null
 
-# Get location ID
 location_id=$(curl -s -H "Authorization: Bearer $api_key" "$panel_url/api/application/locations" | jq '.data[0].attributes.id')
-
-# Node IP
 node_ip=$(hostname -I | awk '{print $1}')
 
-# Create node
 curl -s -X POST "$panel_url/api/application/nodes" \
   -H "Authorization: Bearer $api_key" \
   -H "Content-Type: application/json" \
@@ -195,7 +201,8 @@ curl -s -X POST "$panel_url/api/application/nodes" \
     \"daemon_base\": \"/var/lib/pterodactyl\"
 }" > /dev/null
 
-echo -e "\n✅ All installed!"
+# ✅ Final Output
+echo -e "\n✅ Pterodactyl setup complete!"
 echo "🌐 Panel: https://$tunnel_domain"
-echo "🧠 Node: AutoNode | 500 GB RAM | 600 GB Disk"
-echo "🛠️ Script by Advik 💜"
+echo "🧠 Node: AutoNode | 500GB RAM | 600GB Disk"
+echo "🛠️ Installed using Advik's script 💜"
