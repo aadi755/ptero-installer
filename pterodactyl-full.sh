@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 💜 One-Click Pterodactyl Installer with Cloudflare Tunnel & Auto Node
+# 💜 One-Click Pterodactyl Installer with instan boost gameplay
 # Made by Advik
 
 # ✅ Termius-safe detection
