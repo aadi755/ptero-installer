@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# 💜 Advik Panel + Wings Installer (Termius-Safe)
+# 💜 Advik Panel + Wings Installer
 echo -e "\e[1;35m"
 echo "=============================================="
 echo "   Advik's One-Click Pterodactyl Setup"
-echo "   Panel + Daemon + Safe for Termius 🚀"
+echo "   Panel + Daemon 🚀"
 echo "=============================================="
 echo -e "\e[0m"
 
