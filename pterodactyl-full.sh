@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 💜 One-Click Pterodactyl Installer with Permanent Cloudflare Tunnel
+# 💜 One-Click Pterodactyl Installer with Cloudflare Tunnel & Auto Node
 # Made by Advik
 
 # ✅ Termius-safe detection
@@ -10,12 +10,12 @@ else
     echo -e "\e[1;33m⚠️ Not in Termius. Continuing anyway...\e[0m"
 fi
 
-# 📦 Update & install dependencies
+# 📦 System update
 apt update -y && apt upgrade -y
 apt install -y curl wget sudo gnupg software-properties-common \
-  ca-certificates apt-transport-https unzip tar lsb-release
+  ca-certificates apt-transport-https unzip tar lsb-release jq
 
-# 🧬 PHP 8.1
+# 🧬 PHP 8.1 setup
 add-apt-repository ppa:ondrej/php -y
 apt update -y
 apt install -y php8.1 php8.1-{cli,common,mbstring,gd,curl,mysql,bcmath,xml,fpm,zip}
@@ -24,7 +24,7 @@ apt install -y php8.1 php8.1-{cli,common,mbstring,gd,curl,mysql,bcmath,xml,fpm,z
 apt install -y mariadb-server
 systemctl enable --now mariadb
 
-# 🔐 MySQL Setup
+# 🔐 MySQL user + DB
 mysql -u root <<MYSQL_SCRIPT
 CREATE DATABASE panel;
 CREATE USER 'ptero'@'127.0.0.1' IDENTIFIED BY 'StrongPassword123!';
@@ -43,7 +43,7 @@ mv composer.phar /usr/local/bin/composer
 # 🌍 NGINX
 apt install -y nginx
 
-# 📂 Panel Installation
+# 📂 Panel setup
 mkdir -p /var/www/pterodactyl
 cd /var/www/pterodactyl
 curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
@@ -54,7 +54,7 @@ composer install --no-dev --optimize-autoloader
 cp .env.example .env
 php artisan key:generate --force
 
-# ⚙️ Configure .env DB
+# ⚙️ Database config
 sed -i "s/DB_DATABASE=.*/DB_DATABASE=panel/" .env
 sed -i "s/DB_USERNAME=.*/DB_USERNAME=ptero/" .env
 sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=StrongPassword123!/" .env
@@ -63,7 +63,7 @@ php artisan migrate --seed --force
 chown -R www-data:www-data /var/www/pterodactyl
 chmod -R 755 storage bootstrap/cache
 
-# 🌐 NGINX Config
+# 🌐 NGINX config
 cat > /etc/nginx/sites-available/pterodactyl <<EOF
 server {
     listen 80;
@@ -89,18 +89,13 @@ ln -s /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 systemctl restart nginx php8.1-fpm
 
-# 🧬 Wings Install
+# 🧬 Wings install
 mkdir -p /etc/pterodactyl
 cd /etc/pterodactyl
 curl -Lo wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
 chmod +x wings
 
-# 📥 Ask for config URL
-echo -e "\n📥 Paste your Wings config URL (from panel node setup):"
-read -p "🔗 URL: " config_url
-curl -Lo config.yml "$config_url"
-
-# 🛠️ Wings systemd
+# 🛠 Wings systemd
 cat > /etc/systemd/system/wings.service <<EOF
 [Unit]
 Description=Pterodactyl Wings Daemon
@@ -121,21 +116,21 @@ EOF
 systemctl daemon-reexec
 systemctl enable --now wings
 
-# 🌩️ Permanent Cloudflare Tunnel Setup
-read -p "🌐 Enter your Cloudflare Tunnel NAME (e.g. auranodes-panel): " tunnel_name
-read -p "🔗 Enter your full domain (e.g. panel.yourdomain.com): " tunnel_domain
+# 🌐 Wings config
+echo -e "\n📥 Paste your Wings config URL (from panel node setup):"
+read -p "🔗 URL: " config_url
+curl -Lo config.yml "$config_url"
 
-echo -e "\n📦 Installing Cloudflare Tunnel (cloudflared)..."
+# 🌩️ Cloudflare Tunnel (Permanent)
+read -p "🌐 Tunnel NAME (e.g. auranodes-panel): " tunnel_name
+read -p "🔗 Full domain (e.g. panel.domain.com): " tunnel_domain
+
+echo -e "\n☁️ Installing cloudflared..."
 wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O /usr/local/bin/cloudflared
 chmod +x /usr/local/bin/cloudflared
 
-echo -e "\n🌐 Logging into Cloudflare (browser will open)..."
 cloudflared tunnel login
-
-echo -e "\n📁 Creating named tunnel: $tunnel_name"
 cloudflared tunnel create "$tunnel_name"
-
-echo -e "\n🌍 Routing domain to tunnel..."
 cloudflared tunnel route dns "$tunnel_name" "$tunnel_domain"
 
 mkdir -p /etc/cloudflared
@@ -167,10 +162,40 @@ EOF
 systemctl daemon-reexec
 systemctl enable --now cloudflared
 
-# ✅ Final Output
-echo -e "\n✅ All done!"
-echo "🌐 Panel is live at: https://$tunnel_domain"
-echo "🧠 MySQL: user=ptero / pass=StrongPassword123!"
-echo "🚀 Wings installed and running"
-echo "🛡️ Cloudflare Tunnel active and permanent"
+# 🔧 Auto Node (RAM 500000, Disk 600000)
+read -p "🔑 Admin API Key: " api_key
+read -p "🌍 Panel URL (e.g. https://panel.yourdomain.com): " panel_url
+
+# Create location
+curl -s -X POST "$panel_url/api/application/locations" \
+  -H "Authorization: Bearer $api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"short":"default","long":"Default Location"}' > /dev/null
+
+# Get location ID
+location_id=$(curl -s -H "Authorization: Bearer $api_key" "$panel_url/api/application/locations" | jq '.data[0].attributes.id')
+
+# Node IP
+node_ip=$(hostname -I | awk '{print $1}')
+
+# Create node
+curl -s -X POST "$panel_url/api/application/nodes" \
+  -H "Authorization: Bearer $api_key" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"AutoNode\",
+    \"location_id\": $location_id,
+    \"fqdn\": \"$node_ip\",
+    \"scheme\": \"http\",
+    \"memory\": 500000,
+    \"disk\": 600000,
+    \"upload_size\": 100,
+    \"daemon_listen\": 8080,
+    \"daemon_sftp\": 2022,
+    \"daemon_base\": \"/var/lib/pterodactyl\"
+}" > /dev/null
+
+echo -e "\n✅ All installed!"
+echo "🌐 Panel: https://$tunnel_domain"
+echo "🧠 Node: AutoNode | 500 GB RAM | 600 GB Disk"
 echo "🛠️ Script by Advik 💜"
